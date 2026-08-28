@@ -1,0 +1,10 @@
+aiogram==3.4.1
+httpx
+httpx-socks
+requests
+urllib3
+python-dotenv
+stripe
+beautifulsoup4
+lxml
+aiohttp

@@ -1,0 +1,225 @@
+
+
+hchk.cards — Complete Bot Specification &amp; Deployment Guide
+Merged from: Bot.py Feature Update.docx | Debugging Bot Errors.docx | Docker पर टेलीग्राम बोट.docx
+Date: 2026-08-18
+Bot Name: hchk.cards | Powered by: @racisthenry
+PART 1: BOT REQUIREMENTS &amp; SPECIFICATIONS
+1.1 Bot Identity
+Bot Name: hchk.cards
+Powered By: @racisthenry
+Channel: https://t.me/+ODR6vIC6G-03MTkx
+Group: https://t.me/+rxioFiLN2ZBmZTcx
+Language: Python (aiogram 3.4.1)
+File Upload Max: 25MB
+1.2 Access Levels &amp; Limits
+Role
+CC Limit
+File Limit
+Access
+Free
+300
+25MB
+Basic commands only
+Premium
+8,000
+25MB
+All check commands
+Admin
+15,000
+25MB
+All + admin commands
+Owner
+30,000
+25MB
+Everything
+1.3 Credits System
+/ckey &lt;users&gt; &lt;credits&gt;  →  Credits-only key (extra checks beyond role limit)
+/pkey &lt;users&gt; &lt;days&gt; &lt;credits&gt;  →  Premium + Credits key
+/redeem &lt;key&gt;  →  Redeem key
+Logic: Credits = extra checks on top of role limit. Example: Free (300) + 5000 credits = 5300 total checks.
+1.4 UI / Font / Design
+Font: Mathematical Italic (Unicode) — used for ALL headers, welcome/profile text, and labels.
+Welcome/Profile (/start, /me, /cmds): X D Bot Style — clean, italic, role/limit/access display.
+Check Results (All Gates): ELVE GOLD Style — arrows (→), separators (━━━━), BIN block, progress bar.
+Premium Emojis: Every single message uses premium custom emoji IDs (200+ IDs from @K11R7A). Fallback to standard emojis if ID not set.
+1.5 Output Format (ELVE GOLD Style)
+Charged / Success!━━━━━━━━━━━━Card → 4019240250635227|08|26|018Gate → SHOPIFYSite → ymca*******************ds.myshopify.comAmount → $5.00Code → ORDER_PLACED━━━━━━━━━━━━BIN → VISAType → PREPAID CLASSICBank → KANMU, INC.Country → JP━━━━━━━━━━━━User → @usernamePowered by @racisthenry
+PART 2: COMPLETE COMMAND LIST
+2.1 Free Commands
+/sc — Single card check (Shopify)
+/msc — Mass check inline (Shopify)
+/msctxt — Mass check .txt file (Shopify)
+/bin — BIN lookup
+/dork — Brave URL scraper
+/proxy — Set proxy
+/myproxy — View proxy
+/rmproxy — Remove proxy
+/redeem — Redeem key
+/start — Welcome card
+/me — Profile card
+/cmds — Command list
+2.2 Premium+ Commands
+/st, /mst, /stxt — WooCommerce ST
+/rz, /mrz, /rztxt — Razorpay
+/st1, /mst1, /st1txt — Stripe $1
+/chk, /mchk, /chktxt — Stripe Auth
+/vbv, /mvbv — Braintree VBV
+/br, /mbr, /brtxt — Braintree Auth
+/b3, /mb3, /b3txt — B3 Auth
+/hit — Stripe Checkout (Premium+, NopeCHA support)
+/skcvv, /mskcvv, /sktxt, /skadd — Stripe SK checker
+/gate — Gateway Lookup (auto scan, no-captcha/no-cloudflare filter)
+2.3 Admin + Owner Commands
+/auth &lt;id&gt; [days] — Give premium
+/unauth &lt;id&gt; — Remove premium
+/ban &lt;id&gt; — Ban user
+/unban &lt;id&gt; — Unban user
+/key &lt;users&gt; &lt;days&gt; — Generate multi-use premium key
+/nopecha &lt;key&gt; — Set NopeCHA API key
+/broad &lt;message&gt; — Broadcast message (Admin + Owner)
+2.4 Owner-Only Commands
+/admin &lt;id&gt; — Add admin
+/unadmin &lt;id&gt; — Remove admin
+/filter — Filter dead sites
+/imaintain &lt;reason&gt; — Maintenance ON
+/cmaintain — Maintenance OFF
+/api — View nodes status
+/ckey &lt;users&gt; &lt;credits&gt; — Credits-only key
+/pkey &lt;users&gt; &lt;days&gt; &lt;credits&gt; — Premium + credits key
+2.5 Site Management (User-Added Sites)
+Only for ST and RZ gates. Other gates use built-in hardcoded rotation.
+/stsite &lt;url&gt;, /strem &lt;#&gt;, /stmysite — WooCommerce ST
+/rzsite &lt;url&gt;, /rzrem &lt;#&gt;, /rzmysite — Razorpay
+PART 3: SYSTEM FEATURES
+File Check Flow: Upload .txt → /yes or /no (show approved?) → Proxy check → Progress bar → Live stats → /stop support
+Maintenance Mode: /imaintain &lt;reason&gt; = global pause, /cmaintain = resume
+Proxy System: /proxy, /myproxy, /rmproxy — mandatory before checks
+SK Checker: /skcvv, /mskcvv, /sktxt, /skadd — uses sk.py module (adapted from X D channel)
+Gateway Lookup: /gate — auto scan URLs, filter no-captcha/no-cloudflare sites
+NopeCHA: /hit command hCaptcha auto-solve support
+Logs: Charged/Approved cards → Monitor group + Approved group + Channel notification
+Anti-Spam: Auto-ban &gt;20 events in 10s window
+Hit/OP Pin: Order placed cards user chat mein PIN honge
+ThreadPool: 500 workers
+Semaphore: 100 per user for mass checks
+Cooldown: 20s per user for /sc, /msc, /br
+PART 4: FILE STRUCTURE
+4.1 Core Bot Files (To Keep)
+bot.py — Main bot (handlers, UI, routing)
+auth.py — User auth, roles, credits, keys, bans
+helpers.py — Proxy parse, BIN lookup, CC extract, gate response classify
+checker_bridge.py — Shopify gate
+st.py — WooCommerce gate
+rz.py — Razorpay gate
+chk.py — Stripe Auth gate
+vbv.py — Braintree VBV gate
+b3auth.py — B3 Auth gate
+braintree1$.py — Braintree Auth gate
+stripe1$.py — Stripe $1 gate
+hit.py — Stripe Checkout gate
+sk.py — Stripe SK gate (from X D channel, adapted)
+gate.py — Gateway lookup scanner
+dork.py — Brave scraper
+webshare.py — Free proxy fetch
+sites.txt — Shopify sites list
+4.2 Config/Data Files (Auto-Created)
+owner.json — {"id": 8865878738}
+config.json — Approved group ID, Monitor group ID
+admins.json — Admin IDs (empty array = no admins)
+users.json, keys.json, credits.json, banned.json, proxy.json
+stsite.json, rzsite.json, skkeys.json
+4.3 Files to Remove
+ai.py
+ai skill folder
+.gitignore (optional)
+PART 5: PREMIUM EMOJI MAPPING
+Replace YOUR_EMOJI_ID_XXX with actual Telegram custom emoji IDs from @K11R7A bot.
+Use
+Emoji ID
+Charged
+5323373120260695190
+Approved/Live
+5325881737643847450
+Declined
+5323395299471813204
+3DS/OTP
+5323393718923848521
+Error/Timeout
+5323745386551077258
+Loading
+5325975385110766586
+Stop
+5325764789979344884
+Card
+5472250091332993630
+Gate
+5323337128434755671
+Site
+5134452506935427991
+Amount
+5039789890133296083
+BIN
+5332455502917949981
+Bank
+5854784287013867183
+Country
+5285452600601237916
+User
+5321304384838057247
+Crown/Role
+5980995951160987855
+PART 6: DEPLOYMENT GUIDE
+6.1 Requirements
+aiogram==3.4.1httpxrequestspython-dotenvstripebeautifulsoup4lxmlaiohttp
+6.2 Railway Deploy Steps
+Create requirements.txt (content above) in repo root.
+Create owner.json: {"id": 8865878738}
+Set environment variable BOT_TOKEN in Railway dashboard (NEVER hardcode in bot.py)
+Builder: Nixpacks (select in Railway settings)
+Custom Build Command: LEAVE BLANK
+Custom Start Command: python bot.py
+Deploy → Bot will auto-install dependencies and start polling.
+6.3 Environment Variables
+Variable
+Value
+BOT_TOKEN
+8360806346:AAHL4Vdg4d5N279nQQPjmv-nG3QTP16upVc (or new token)
+PYTHON_VERSION
+3.11
+6.4 Docker Deployment (Alternative)
+FROM python:3.11-slimWORKDIR /appCOPY requirements.txt .RUN pip install --no-cache-dir -r requirements.txtCOPY . .CMD ["python", "bot.py"]
+PART 7: DEBUGGING HISTORY &amp; KNOWN ISSUES
+7.1 Issues Already Fixed
+helpers.py missing functions (classify_gate_response, gate_is_charged, gate_is_approved) — ADDED
+import ayden (missing file) — COMMENTED OUT
+auth.py missing get_user_role method — ADDED inside UserAuth class + module-level wrapper
+owner.json was in wrong format ([list]) — FIXED to {"id": 8865878738}
+auth.py module-level wrapper functions added (is_owner, is_admin, has_premium_access, save_user, etc.)
+Token was revoked multiple times because shared in chat — USE .env ONLY
+pycache/ permission denied — use python -B flag or sudo rm -rf __pycache__
+Railway requirement.txt vs requirements.txt naming — MUST be requirements.txt (plural with s)
+Railway builder must be Nixpacks, Custom Build Command must be BLANK, Start Command = python bot.py
+7.2 Critical Debugging Notes
+If bot receives updates but sends no reply (Duration 0 ms):
+1. Check auth.py has get_user_role() method inside UserAuth class.
+2. Check .env has valid BOT_TOKEN (not revoked).
+3. Check bot is admin in channel/group (for join check).
+4. If premium emojis fail, bot falls back to standard emojis or plain text.
+5. Use python -B bot.py to avoid pycache permission issues.
+7.3 Token Security Rules
+NEVER share token in chat — Telegram auto-revokes it.
+NEVER commit .env to GitHub — add .env to .gitignore.
+Always use os.environ.get("BOT_TOKEN") in bot.py.
+PART 8: QUICK SETUP CHECKLIST
+☐ owner.json created with correct Telegram User ID
+☐ config.json created with approved_group_id and monitor_group_id
+☐ .env file created with BOT_TOKEN (not committed to GitHub)
+☐ requirements.txt created with all dependencies
+☐ All gate modules present in same folder as bot.py
+☐ Bot is admin in both channel and group (for join check)
+☐ Premium emoji IDs updated in E dictionary (or fallback enabled)
+☐ Mathematical Italic font used consistently (no bold sans-serif mixed)
+☐ Railway builder = Nixpacks, Build Command = BLANK, Start Command = python bot.py
+☐ Deploy and test /start → should reply with welcome card
+--- END OF DOCUMENT ---

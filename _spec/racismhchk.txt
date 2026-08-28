@@ -1,0 +1,249 @@
+# SYSTEM INSTRUCTION PROMPT — hchk.cards Telegram CC Checker Bot
+
+## 1. PROJECT OVERVIEW
+Build and maintain a Telegram CC (Credit Card) Checker Bot named **hchk.cards**, powered by **@racisthenry**.
+- **Language**: Python 3.11+
+- **Framework**: aiogram 3.4.1
+- **Max File Upload**: 25MB
+- **Channel**: https://t.me/+ODR6vIC6G-03MTkx
+- **Group**: https://t.me/+rxioFiLN2ZBmZTcx
+
+## 2. UI/UX DESIGN RULES (STRICT)
+
+### 2.1 Font
+- **EXCLUSIVELY use Mathematical Italic Unicode font** for ALL text, headers, labels, commands, and status messages.
+- NEVER mix sans-serif bold. If a `bold()` function exists, it must internally call the italic converter.
+- Example: `𝑊𝑒𝑙𝑐𝑜𝑚𝑒`, `@𝑢𝑠𝑒𝑟`, `𝑅𝑜𝑙𝑒 → 𝐹𝑟𝑒𝑒`
+
+### 2.2 Two UI Modes
+| Mode | Used For | Style |
+|------|----------|-------|
+| **X D Bot** | `/start`, `/me`, `/cmds` | Clean italic, role/limit/access display, inline buttons |
+| **ELVE GOLD** | All check results, file checks, maintenance | Arrows (→), separator lines (━━━━), BIN block, progress bar, "Powered by @racisthenry" footer |
+
+### 2.3 Premium Emojis
+- **Every single message** must use premium custom emoji IDs via `<tg-emoji emoji-id="ID">⭕</tg-emoji>` tags.
+- Fallback chain: Premium emoji → Standard Unicode emoji → Plain text (never crash).
+- Key mappings:
+  - Charged: `5323373120260695190`
+  - Approved: `5325881737643847450`
+  - Declined: `5323395299471813204`
+  - 3DS/OTP: `5323393718923848521`
+  - Error: `5323745386551077258`
+  - Loading: `5325975385110766586`
+  - Card: `5472250091332993630`
+  - Gate: `5323337128434755671`
+  - Site: `5134452506935427991`
+  - Amount: `5039789890133296083`
+  - BIN: `5332455502917949981`
+  - Bank: `5854784287013867183`
+  - Country: `5285452600601237916`
+  - User: `5321304384838057247`
+  - Crown/Role: `5980995951160987855`
+
+## 3. ACCESS LEVELS & LIMITS
+
+| Role | CC Limit | File Limit | Access |
+|------|----------|------------|--------|
+| Free | 300 | 25MB | Basic commands only |
+| Premium | 8,000 | 25MB | All check commands |
+| Admin | 15,000 | 25MB | All + admin commands |
+| Owner | 30,000 | 25MB | Everything |
+
+## 4. COMMANDS (38 Total)
+
+### 4.1 Free Commands
+`/sc`, `/msc`, `/msctxt`, `/bin`, `/dork`, `/proxy`, `/myproxy`, `/rmproxy`, `/redeem`, `/start`, `/me`, `/cmds`
+
+### 4.2 Premium+ Commands
+`/st`, `/mst`, `/stxt`, `/rz`, `/mrz`, `/rztxt`, `/st1`, `/mst1`, `/st1txt`, `/chk`, `/mchk`, `/chktxt`, `/vbv`, `/mvbv`, `/br`, `/mbr`, `/brtxt`, `/b3`, `/mb3`, `/b3txt`, `/hit`, `/skcvv`, `/mskcvv`, `/sktxt`, `/skadd`, `/gate`
+
+### 4.3 Admin + Owner Commands
+`/auth`, `/unauth`, `/ban`, `/unban`, `/key`, `/nopecha`, `/broad`
+
+### 4.4 Owner-Only Commands
+`/admin`, `/unadmin`, `/filter`, `/imaintain`, `/cmaintain`, `/api`, `/ckey`, `/pkey`
+
+### 4.5 Site Management (User-Added Sites)
+Only for ST and RZ gates. Other gates use built-in hardcoded rotation.
+- ST: `/stsite <url>`, `/strem <#>`, `/stmysite`
+- RZ: `/rzsite <url>`, `/rzrem <#>`, `/rzmysite`
+
+## 5. OUTPUT FORMAT (ELVE GOLD Style)
+
+### Single Check Result
+```
+Charged / Success!
+━━━━━━━━━━━━
+Card → 4019240250635227|08|26|018
+Gate → SHOPIFY
+Site → ymca*******************ds.myshopify.com
+Amount → $5.00
+Code → ORDER_PLACED
+━━━━━━━━━━━━
+BIN → VISA
+Type → PREPAID CLASSIC
+Bank → KANMU, INC.
+Country → JP
+━━━━━━━━━━━━
+User → @username
+Powered by @racisthenry
+```
+
+### File Check Progress
+```
+Live Checking
+━━━━━━━━━━━━
+████████████░░░░░░░░ 0.0%
+Total → 7721
+Checked → 0
+Charged → 0
+Approved → 0
+Declined → 0
+Errors → 0
+━━━━━━━━━━━━
+Elapsed → 00:00:06
+```
+
+## 6. FILE CHECK FLOW
+1. User uploads `.txt` file
+2. Bot detects → "CARDS LOADED" message
+3. Asks: `/yes` (show approved) or `/no` (hide approved)
+4. Checks proxy → If none, asks to add
+5. "Starting Check" → "Proxy Check Done"
+6. "Live Checking" with progress bar + live stats
+7. "Check Finished" with final summary
+8. User can `/stop` anytime to halt mid-check
+
+## 7. SYSTEM FEATURES
+
+### 7.1 Maintenance Mode
+- `/imaintain <reason>` = global pause, stops all active sessions
+- `/cmaintain` = resume operations
+- Paused sessions show progress and allow re-upload
+
+### 7.2 Credits System
+- `/ckey <users> <credits>` = Credits-only key (extra checks beyond role limit)
+- `/pkey <users> <days> <credits>` = Premium + Credits key
+- `/redeem <key>` = Redeem key
+- Logic: Credits = extra checks ON TOP of role limit. Example: Free (300) + 5000 credits = 5300 total checks.
+
+### 7.3 Proxy System
+- `/proxy`, `/myproxy`, `/rmproxy`
+- Mandatory before checks. Bot verifies proxies before starting.
+- No proxy = stop and ask user to add.
+
+### 7.4 SK Checker
+- Uses `sk.py` module (adapted from X D channel)
+- Commands: `/skcvv`, `/mskcvv`, `/sktxt`, `/skadd`
+- `/skadd` validates key + auto test charge
+- Returns: charged, live, declined, error
+- If `sk.py` missing, return "Stripe SK module not available"
+
+### 7.5 Gateway Lookup
+- `/gate` command: auto scan URLs from uploaded `.txt`
+- Filter: Only no-captcha, no-cloudflare sites
+- Uses `gate.py` module
+
+### 7.6 Logs & Notifications
+- Charged/Approved cards → PIN in user chat + forward to Monitor Group + Approved Group + Channel notification
+- Declined → user chat only
+
+### 7.7 Anti-Spam
+- Auto-ban >20 events in 10s window
+- Rate limit: 20s cooldown per user for `/sc`, `/msc`, `/br`
+- ThreadPool: 500 workers, Semaphore: 100 per user for mass checks
+
+## 8. FILE STRUCTURE
+
+### Core Files (KEEP)
+- `bot.py` — Main bot (handlers, UI, routing)
+- `auth.py` — UserAuth class + module-level wrappers (is_owner, is_admin, get_user_role, save_user, etc.)
+- `helpers.py` — parse_proxy_format, test_proxy, bin_lookup, extract_cc, classify_gate_response, gate_is_charged, gate_is_approved
+- `checker_bridge.py` — Shopify gate (`check_card_site` function)
+- `st.py`, `rz.py`, `chk.py`, `vbv.py`, `b3auth.py`, `braintree1$.py`, `stripe1$.py`, `hit.py`, `sk.py`, `gate.py`, `dork.py`, `webshare.py`
+- `sites.txt` — Shopify sites list
+
+### Config/Data Files (Auto-Create if Missing)
+- `owner.json` = `{"id": 8865878738}`
+- `config.json` = `{"approved_group_id": null, "monitor_group_id": null}`
+- `admins.json`, `users.json`, `keys.json`, `credits.json`, `banned.json`, `proxy.json`, `stsite.json`, `rzsite.json`, `skkeys.json`
+
+### Files to REMOVE
+- `ai.py`, `ai skill/` folder, `.gitignore` (optional)
+
+## 9. CRITICAL CODING RULES
+
+### 9.1 auth.py Requirements
+- `UserAuth` class MUST have `get_user_role(self, user_id)` method returning: "owner" | "admin" | "premium" | "free"
+- Module-level wrapper functions MUST exist: `is_owner()`, `is_admin()`, `has_premium_access()`, `save_user()`, `get_user_role()`, `get_premium_expiry()`, `get_all_user_ids()`, `add_admin()`, `remove_admin()`, `auth_user()`, `unauth_user()`, `generate_keys()`, `redeem_key()`, `is_premium()`, `save_charged_cc()`
+- These wrappers call `user_auth = UserAuth()` internally.
+
+### 9.2 helpers.py Requirements
+- MUST export: `parse_proxy_format`, `test_proxy`, `bin_lookup`, `extract_cc`, `close_session`, `classify_gate_response`, `gate_is_charged`, `gate_is_approved`, `proxy_dict_to_url`
+
+### 9.3 bot.py Requirements
+- Token MUST be loaded from environment: `os.environ.get("BOT_TOKEN")` — NEVER hardcode.
+- Use `python-dotenv` for `.env` support.
+- Gate modules MUST be imported with `try/except` — if missing, command returns "Module not loaded" but bot continues running.
+- `checker_bridge.py` function is `check_card_site()`, NOT `check()`.
+- ALL handlers MUST have try/except with visible error logging (print to console at minimum).
+- Global error handler MUST print errors to console (not just log to file).
+- Use `python -B bot.py` to avoid `__pycache__` permission issues.
+
+### 9.4 Join Check
+- Bot checks if user is member of `join_channel_id` and `join_chat_id`.
+- Valid statuses: MEMBER, ADMINISTRATOR, CREATOR.
+- If not joined, send `JOIN_MSG` with inline buttons linking to channel/group.
+
+## 10. DEPLOYMENT
+
+### 10.1 requirements.txt
+```
+aiogram==3.4.1
+httpx
+requests
+python-dotenv
+stripe
+beautifulsoup4
+lxml
+aiohttp
+```
+
+### 10.2 Railway Deploy
+- Builder: **Nixpacks**
+- Custom Build Command: **BLANK** (empty)
+- Custom Start Command: `python bot.py`
+- Environment Variables:
+  - `BOT_TOKEN` = your_token_here
+  - `PYTHON_VERSION` = 3.11
+- File MUST be named `requirements.txt` (plural with 's'), NOT `requirement.txt`.
+
+### 10.3 Docker Alternative
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "bot.py"]
+```
+
+## 11. TOKEN SECURITY (CRITICAL)
+- NEVER share token in chat — Telegram auto-revokes it.
+- NEVER commit `.env` to GitHub — add `.env` to `.gitignore`.
+- Always use `os.environ.get("BOT_TOKEN")` in code.
+- If `TelegramUnauthorizedError` appears, token is revoked — generate new from @BotFather.
+
+## 12. DEBUGGING CHECKLIST
+If bot receives updates but sends no reply ("Duration 0 ms"):
+1. Check `auth.py` has `get_user_role()` inside `UserAuth` class.
+2. Check `.env` has valid `BOT_TOKEN`.
+3. Check bot is admin in channel/group.
+4. Check `requirements.txt` exists (plural name).
+5. Run with `python -B bot.py` to skip pycache.
+6. Add `print()` statements in handlers to trace execution.
+7. If premium emojis fail, ensure fallback to standard emojis works.
+
+---
+END OF INSTRUCTION PROMPT

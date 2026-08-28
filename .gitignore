@@ -1,0 +1,10 @@
+.env
+.env.local
+venv/
+__pycache__/
+*.pyc
+*.log
+bot.log
+bot_error.log
+nopecha_key.txt
+charged_cc.json
