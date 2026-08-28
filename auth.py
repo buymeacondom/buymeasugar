@@ -272,6 +272,15 @@ class UserAuth:
         data[uid].append({"cc": cc_str, "time": datetime.utcnow().isoformat()})
         _save_json(CHARGED_FILE, data)
 
+    def set_nopecha_key(self, user_id: int, key: str):
+        uid = str(user_id)
+        self.users.setdefault(uid, {})["nopecha"] = key
+        self._persist("users")
+
+    def get_nopecha_key(self, user_id: int) -> str:
+        uid = str(user_id)
+        return self.users.get(uid, {}).get("nopecha", "")
+
 
 # Module-level singleton
 user_auth = UserAuth()
@@ -286,7 +295,8 @@ def is_admin(user_id: int) -> bool:
     return user_auth.is_admin(user_id)
 
 
-def has_premium_access(user_id: int) -> bool:
+def has_premium_access(user_id: int, chat_id: int | None = None) -> bool:
+    # chat_id accepted for call-site compatibility (ignored)
     return user_auth.has_premium_access(user_id)
 
 
@@ -343,8 +353,21 @@ def is_premium(user_id: int) -> bool:
     return user_auth.is_premium(user_id)
 
 
-def save_charged_cc(user_id: int, cc_str: str):
+def save_charged_cc(cc_str: str, user_id: int, full_name: str = "", gate: str = "", price: str = ""):
+    # All bot.py call sites pass (cc_str, user_id, full_name, gate, price)
     return user_auth.save_charged_cc(user_id, cc_str)
+
+
+def load_admins() -> list:
+    return list(user_auth.admins)
+
+
+def set_nopecha_key(user_id: int, key: str):
+    return user_auth.set_nopecha_key(user_id, key)
+
+
+def get_nopecha_key(user_id: int) -> str:
+    return user_auth.get_nopecha_key(user_id)
 
 
 def ban_user(user_id: int):

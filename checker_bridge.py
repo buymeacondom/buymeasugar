@@ -111,3 +111,35 @@ async def check_card_site(cc: str, site: str | None = None, proxy: dict | None =
         "Approved": str(approved),
         "Code": str(response).upper() if "order" in str(response).lower() else "",
     }
+
+
+# ── Checker node management (used by /api and /filter) ─────────────────────────
+# With a single remote API, the "node" is the API server itself.
+_NODES = [SHOPIFY_API_BASE]
+_NODE_DISABLED: set[str] = set()
+
+
+def get_all_nodes() -> list:
+    return list(_NODES)
+
+
+def is_node_disabled(node: str) -> bool:
+    return node in _NODE_DISABLED
+
+
+def enable_node(node: str) -> None:
+    _NODE_DISABLED.discard(node)
+
+
+def disable_node(node: str) -> None:
+    _NODE_DISABLED.add(node)
+
+
+async def check_node_health(node: str) -> bool:
+    """Ping a node — returns True if it answers (any HTTP status < 500)."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"{node}/")
+            return resp.status_code < 500
+    except Exception:
+        return False
