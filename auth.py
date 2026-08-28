@@ -330,6 +330,11 @@ def generate_key(key_type: str, max_users: int, days: int = 0, credits: int = 0)
     return user_auth.generate_key(key_type, max_users, days, credits)
 
 
+def generate_keys(max_users: int, days: int = 0, credits: int = 0, created_by: int = 0) -> list[str]:
+    """Module-level wrapper for UserAuth.generate_keys (used by /key)."""
+    return user_auth.generate_keys(max_users, days, credits, created_by)
+
+
 def redeem_key(user_id: int, key: str) -> tuple[bool, str]:
     return user_auth.redeem_key(user_id, key)
 
