@@ -1248,6 +1248,80 @@ dp.callback_query.middleware(_ThrottleMiddleware())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  MAINTENANCE MODE — owner only: /imaintain <reason> · /cmaintain
+# ══════════════════════════════════════════════════════════════════════════════
+
+MAINTENANCE_MODE = False
+MAINTENANCE_REASON = ""
+
+
+def set_all_stop_flags(value: bool = True) -> None:
+    """Flip every per-command stop flag — halts active check sessions."""
+    for _flags in (
+        _RAN_STOP_FLAGS, _AYD_STOP_FLAGS, _HIT_STOP_FLAGS, _STXT_STOP_FLAGS,
+        _RZTXT_STOP_FLAGS, _CHKTXT_STOP_FLAGS, _ST1TXT_STOP_FLAGS,
+        _SKTXT_STOP_FLAGS, _BRTXT_STOP_FLAGS, _B3TXT_STOP_FLAGS,
+    ):
+        for _k in list(_flags):
+            _flags[_k] = value
+
+
+class _MaintenanceMiddleware(_BaseMiddleware):
+    """Blocks all commands except management ones while maintenance is ON."""
+
+    async def __call__(self, handler, event, data):
+        if MAINTENANCE_MODE and isinstance(event, types.Message):
+            text = getattr(event, "text", "") or ""
+            cmd = text.split()[0].lstrip("/").lower() if text.startswith("/") else ""
+            if cmd and cmd not in ("imaintain", "cmaintain", "start", "me", "cmds", "help", "adc"):
+                try:
+                    await event.reply(
+                        f"{pe(E['warn'])} {bold('Maintenance Mode')}\n\n"
+                        f"{pe(E['bolt'])} {bold('Reason:')} {bold(MAINTENANCE_REASON or 'Maintenance in progress')}\n"
+                        f"{pe(E['next'])} {bold('Please try again later.')}"
+                    )
+                except Exception:
+                    pass
+                return
+        return await handler(event, data)
+
+
+dp.message.middleware(_MaintenanceMiddleware())
+
+
+@router.message(Command("imaintain"))
+async def cmd_imaintain(message: types.Message):
+    if not auth.is_owner(message.from_user.id):
+        await message.reply(f"{pe(E['cross'])} {bold('Owner only command!')}")
+        return
+    global MAINTENANCE_MODE, MAINTENANCE_REASON
+    args = message.text.split(maxsplit=1)
+    MAINTENANCE_REASON = args[1].strip() if len(args) > 1 else "Maintenance in progress"
+    MAINTENANCE_MODE = True
+    set_all_stop_flags(True)   # halt every active check session
+    await message.reply(
+        f"{pe(E['wrench'])} {bold('Maintenance Mode ON')}\n\n"
+        f"{pe(E['bolt'])} {bold('Reason:')} {bold(MAINTENANCE_REASON)}\n"
+        f"{pe(E['next'])} {bold('All active checks stopped.')}\n"
+        f"{pe(E['check'])} {bold('Use')} /cmaintain {bold('to resume.')}"
+    )
+
+
+@router.message(Command("cmaintain"))
+async def cmd_cmaintain(message: types.Message):
+    if not auth.is_owner(message.from_user.id):
+        await message.reply(f"{pe(E['cross'])} {bold('Owner only command!')}")
+        return
+    global MAINTENANCE_MODE, MAINTENANCE_REASON
+    MAINTENANCE_MODE = False
+    MAINTENANCE_REASON = ""
+    await message.reply(
+        f"{pe(E['check'])} {bold('Maintenance Mode OFF')}\n\n"
+        f"{pe(E['bolt'])} {bold('Operations resumed.')}"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  JOIN CHECK MIDDLEWARE
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1408,7 +1482,7 @@ def _welcome_card(user) -> str:
     access = {"owner": "All", "admin": "All", "premium": "All", "free": "None"}.get(role, "None")
 
     # Blue command link helper
-    _bot_link = f"https://t.me/{_html.escape(BOT_USERNAME)}"
+    _bot_link = f"tg://user?id={bot.id}"
 
     def _c(name: str) -> str:
         """Render a command name in blue (Telegram link colour)."""
@@ -1549,43 +1623,35 @@ async def cb_menu_check(callback: types.CallbackQuery):
     await callback.answer()
     text = (
         f"{pe(E['gem'])} {bold('Command List')}\n\n"
+        f"{pe(E['star'])} {bold('Shopify:' )}\n"
         f"{pe(E['bolt'])} /sc cc|mm|yy|cvv — {bold('single card check')}\n"
         f"{pe(E['rocket'])} /msc cc|mm|yy|cvv ... — {bold('mass check (inline)')}\n"
-        f"{pe(E['dice'])} /msctxt — {bold('mass check (.txt file)')}\n"
-        f"{pe(E['gem'])} /ayd link cc... — {bold('Adyen checker')}\n"
-        f"{pe(E['gem'])} /hit link cc... — {bold('Stripe checker')}\n\n"
-        f"{pe(E['star'])} {bold('ST Commands (WooCommerce):')}\n"
-        f"{pe(E['plus'])} /sadd site — {bold('Add/test WooCommerce site')}\n"
-        f"{pe(E['bolt'])} /st cc|mm|yy|cvv — {bold('Single ST check')}\n"
-        f"{pe(E['rocket'])} /mst cc ... — {bold('Mass ST check (10 inline)')}\n"
+        f"{pe(E['dice'])} /msctxt — {bold('mass check (.txt file)')}\n\n"
+        f"{pe(E['star'])} {bold('Razorpay:' )}\n"
+        f"{pe(E['plus'])} /rzsite site — {bold('Add/test RZ site')}\n"
+        f"{pe(E['bolt'])} /rz cc|mm|yy|cvv — {bold('single RZ check')}\n"
+        f"{pe(E['rocket'])} /mrz cc ... — {bold('mass RZ check (10 inline)')}\n"
+        f"{pe(E['dice'])} /rztxt — {bold('RZ file check (.txt)')}\n"
+        f"{pe(E['globe'])} /rzmysite — {bold('view saved site')}\n"
+        f"{pe(E['cross'])} /rzrem # — {bold('remove saved site')}\n\n"
+        f"{pe(E['star'])} {bold('Stripe (WooCommerce):')}\n"
+        f"{pe(E['plus'])} /sadd site — {bold('Add/test site')}\n"
+        f"{pe(E['bolt'])} /st cc|mm|yy|cvv — {bold('single ST check')}\n"
+        f"{pe(E['rocket'])} /mst cc ... — {bold('mass ST check (10 inline)')}\n"
         f"{pe(E['dice'])} /stxt — {bold('ST file check (.txt)')}\n"
-        f"{pe(E['bolt'])} /st1 — {bold('Stripe $1 single (proxy)')}\n"
-        f"{pe(E['rocket'])} /mst1 — {bold('Stripe $1 mass (20 CCs)')}\n"
-        f"{pe(E['dice'])} /st1txt — {bold('Stripe $1 file check')}\n"
-        f"{pe(E['bolt'])} /skcvv /mskcvv /sktxt — {bold('Stripe SK $1 charge')}\n"
-        f"{pe(E['plus'])} /skadd sk — {bold('Save SK (auto PK + test)')}\n"
-        f"{pe(E['globe'])} /smysite — {bold('View saved site')}\n"
-        f"{pe(E['cross'])} /srem — {bold('Remove saved site')}\n"
-        f"{pe(E['refresh'])} /stest sites... — {bold('Test sites (max 25)')}\n\n"
-        f"{pe(E['link'])} /proxy host:port:user:pass — {bold('Set proxy')}\n"
-        f"{pe(E['gift'])} /freeproxy — {bold('10 free proxies (24h cooldown)')}\n"
-        f"{pe(E['link'])} /freeproxylist — {bold('Show your pending fetched proxies')}\n"
-        f"{pe(E['link'])} /myproxy — {bold('View current proxy')}\n"
-        f"{pe(E['cross'])} /rmproxy — {bold('Remove proxy')}\n"
-        f"{pe(E['globe'])} /dork keyword — {bold('Brave Search URL scraper (→ .txt)')}\n"
-        f"{pe(E['bank'])} /bin 438854 — {bold('BIN lookup')}\n"
-        f"{pe(E['gift'])} /redeem key — {bold('Redeem access key')}\n"
-        f"{pe(E['bolt'])} /ai prompt — {bold('Ask AI (Kimi) anything · attach files too')}\n"
-        f"{pe(E['user'])} /start — {bold('Main menu')}\n"
-        f"{pe(E['user'])} /me — {bold('Your profile')}\n"
-        f"{pe(E['sparkle'])} /cmds — {bold('This help message')}\n\n"
-        f"{pe(E['star'])} {bold('Admin Commands:')}\n"
-        f"{pe(E['next'])} /admin id — {bold('Add admin')}\n"
-        f"{pe(E['next'])} /auth id — {bold('Give premium')}\n"
-        f"{pe(E['next'])} /unauth id — {bold('Remove premium')}\n"
-        f"{pe(E['next'])} /ban id — {bold('Ban user')}\n"
-        f"{pe(E['next'])} /unban id — {bold('Unban user')}\n"
-        f"{pe(E['next'])} /key users days — {bold('Generate 1 multi-use key')}"
+        f"{pe(E['globe'])} /smysite — {bold('view saved site')}\n"
+        f"{pe(E['cross'])} /srem — {bold('remove saved site')}\n\n"
+        f"{pe(E['star'])} {bold('Stripe $1 (proxy):')}\n"
+        f"{pe(E['bolt'])} /st1 — {bold('Stripe $1 single')}\n"
+        f"{pe(E['rocket'])} /mst1 — {bold('Stripe $1 mass (20)')}\n"
+        f"{pe(E['dice'])} /st1txt — {bold('Stripe $1 file check')}\n\n"
+        f"{pe(E['star'])} {bold('B3 Auth:' )}\n"
+        f"{pe(E['bolt'])} /b3 cc|mm|yy|cvv — {bold('single check')}\n"
+        f"{pe(E['rocket'])} /mb3 cc ... — {bold('mass check')}\n"
+        f"{pe(E['dice'])} /b3txt — {bold('file check (.txt)')}\n\n"
+        f"{pe(E['star'])} {bold('Braintree VBV (2D/3D):')}\n"
+        f"{pe(E['bolt'])} /vbv cc|mm|yy|cvv — {bold('single VBV check')}\n"
+        f"{pe(E['rocket'])} /mvbv cc ... — {bold('mass VBV (20 inline)')}"
     )
     try:
         await safe_edit(callback.message, text, reply_markup=back_keyboard())
@@ -3159,86 +3225,43 @@ def _help_page(page: int) -> tuple[str, dict]:
     if page == 1:
         text = (
             f"{pe(E['gem'])} {bold('Command List')} — Page 1/3\n\n"
+            f"{pe(E['star'])} {bold('Shopify:' )}\n"
             f"{pe(E['bolt'])} /sc cc|mm|yy|cvv — {bold('single card check')}\n"
             f"{pe(E['rocket'])} /msc cc|mm|yy|cvv ... — {bold('mass check (inline)')}\n"
-            f"{pe(E['dice'])} /msctxt — {bold('mass check (.txt file)')}\n"
-            f"{pe(E['gem'])} /ayd link cc... — {bold('Adyen checker')}\n"
-            f"{pe(E['gem'])} /hit link cc... — {bold('Stripe checker')}\n\n"
-            f"{pe(E['star'])} {bold('ST Commands (WooCommerce):')}\n"
-            f"{pe(E['plus'])} /sadd site — {bold('Add/test WooCommerce site')}\n"
-            f"{pe(E['bolt'])} /st cc|mm|yy|cvv — {bold('Single ST check')}\n"
-            f"{pe(E['rocket'])} /mst cc ... — {bold('Mass ST check (10 inline)')}\n"
-            f"{pe(E['dice'])} /stxt — {bold('ST file check (.txt)')}\n"
-            f"{pe(E['globe'])} /smysite — {bold('View saved site')}\n"
-            f"{pe(E['cross'])} /srem — {bold('Remove saved site')}\n"
-            f"{pe(E['refresh'])} /stest sites... — {bold('Test sites (max 25)')}\n\n"
-            f"{pe(E['star'])} {bold('Razorpay Commands:')}\n"
+            f"{pe(E['dice'])} /msctxt — {bold('mass check (.txt file)')}\n\n"
+            f"{pe(E['star'])} {bold('Razorpay:' )}\n"
             f"{pe(E['plus'])} /rzsite site — {bold('Add/test RZ site')}\n"
-            f"{pe(E['bolt'])} /rz cc|mm|yy|cvv — {bold('Single RZ check')}\n"
-            f"{pe(E['rocket'])} /mrz cc ... — {bold('Mass RZ check (10 inline)')}\n"
+            f"{pe(E['bolt'])} /rz cc|mm|yy|cvv — {bold('single RZ check')}\n"
+            f"{pe(E['rocket'])} /mrz cc ... — {bold('mass RZ check (10 inline)')}\n"
             f"{pe(E['dice'])} /rztxt — {bold('RZ file check (.txt)')}\n"
-            f"{pe(E['refresh'])} /rztest sites... — {bold('Test RZ sites (max 25)')}\n\n"
-            f"{pe(E['star'])} {bold('Stripe $1 Gates (proxy):')}\n"
-            f"{pe(E['bolt'])} /st1 — {bold('Stripe $1 single')}\n"
-            f"{pe(E['rocket'])} /mst1 — {bold('Stripe $1 mass (20)')}\n"
-            f"{pe(E['dice'])} /st1txt — {bold('Stripe $1 file')}\n\n"
-            f"{pe(E['star'])} {bold('Stripe SK CVV ($1):')}\n"
-            f"{pe(E['plus'])} /skadd sk — {bold('Save SK (auto PK + test charge)')}\n"
-            f"{pe(E['bolt'])} /skcvv cc|mm|yy|cvv — {bold('Single SK charge')}\n"
-            f"{pe(E['rocket'])} /mskcvv cc ... — {bold('Mass SK charge (10)')}\n"
-            f"{pe(E['dice'])} /sktxt — {bold('SK file check (.txt)')}"
+            f"{pe(E['globe'])} /rzmysite — {bold('view saved site')}\n"
+            f"{pe(E['cross'])} /rzrem # — {bold('remove saved site')}"
         )
     elif page == 2:
         text = (
             f"{pe(E['gem'])} {bold('Command List')} — Page 2/3\n\n"
-            f"{pe(E['star'])} {bold('Stripe Auth (no proxy):')}\n"
-            f"{pe(E['bolt'])} /chk cc|mm|yy|cvv — {bold('Single check')}\n"
-            f"{pe(E['rocket'])} /mchk cc ... — {bold('Mass check (10 inline)')}\n"
-            f"{pe(E['dice'])} /chktxt — {bold('File check (.txt)')}\n\n"
-            f"{pe(E['star'])} {bold('Braintree VBV (2D/3D):')}\n"
-            f"{pe(E['bolt'])} /vbv cc|mm|yy|cvv — {bold('Single VBV check')}\n"
-            f"{pe(E['rocket'])} /mvbv cc ... — {bold('Mass VBV (20 inline)')}\n\n"
-            f"{pe(E['star'])} {bold('Braintree Auth (silvercellwireless.com):')}\n"
-            f"{pe(E['bolt'])} /br cc|mm|yy|cvv — {bold('Single check (all users)')}\n"
-            f"{pe(E['rocket'])} /mbr cc ... — {bold('Mass check (owner only)')}\n"
-            f"{pe(E['dice'])} /brtxt — {bold('File check (.txt, owner only)')}\n\n"
-            f"{pe(E['star'])} {bold('B3 Auth')}\n"
-            f"{pe(E['bolt'])} /b3 cc|mm|yy|cvv — {bold('Single check (all users)')}\n"
-            f"{pe(E['rocket'])} /mb3 cc ... — {bold('Mass check (owner only)')}\n"
-            f"{pe(E['dice'])} /b3txt — {bold('File check (.txt, owner only)')}\n\n"
-            f"{pe(E['star'])} {bold('Proxy / Tools:')}\n"
-            f"{pe(E['link'])} /proxy host:port:user:pass — {bold('Set proxy')}\n"
-        f"{pe(E['gift'])} /freeproxy — {bold('Get 10 free proxies (24h cooldown)')}\n"
-        f"{pe(E['link'])} /freeproxylist — {bold('Show pending fetched proxies')}\n"
-        f"{pe(E['link'])} /myproxy — {bold('View current proxy')}\n"
-        f"{pe(E['cross'])} /rmproxy — {bold('Remove proxy')}\n"
-        f"{pe(E['globe'])} /dork keyword — {bold('Brave Search URL scraper (→ .txt)')}\n"
-            f"{pe(E['bank'])} /bin 438854 — {bold('BIN lookup')}\n"
-            f"{pe(E['gift'])} /redeem key — {bold('Redeem access key')}\n\n"
-            f"{pe(E['star'])} {bold('Captcha Solver (NopeCHA):')}\n"
-            f"{pe(E['bolt'])} /nopecha api_key — {bold('Set NopeCHA key')}\n"
-            f"{pe(E['check'])} /nopecha — {bold('View key status')}\n"
-            f"{pe(E['cross'])} /nopecha clear — {bold('Remove key')}"
+            f"{pe(E['star'])} {bold('Stripe (WooCommerce):')}\n"
+            f"{pe(E['plus'])} /sadd site — {bold('Add/test site')}\n"
+            f"{pe(E['bolt'])} /st cc|mm|yy|cvv — {bold('single ST check')}\n"
+            f"{pe(E['rocket'])} /mst cc ... — {bold('mass ST check (10 inline)')}\n"
+            f"{pe(E['dice'])} /stxt — {bold('ST file check (.txt)')}\n"
+            f"{pe(E['globe'])} /smysite — {bold('view saved site')}\n"
+            f"{pe(E['cross'])} /srem — {bold('remove saved site')}\n\n"
+            f"{pe(E['star'])} {bold('Stripe $1 (proxy):')}\n"
+            f"{pe(E['bolt'])} /st1 — {bold('Stripe $1 single')}\n"
+            f"{pe(E['rocket'])} /mst1 — {bold('Stripe $1 mass (20)')}\n"
+            f"{pe(E['dice'])} /st1txt — {bold('Stripe $1 file check')}"
         )
     else:
         text = (
             f"{pe(E['gem'])} {bold('Command List')} — Page 3/3\n\n"
-            f"{pe(E['sparkle'])} {bold('AI Assistant (Kimi):')}\n"
-            f"{pe(E['bolt'])} /ai prompt — {bold('Ask the AI anything')}\n"
-            f"{pe(E['next'])} Attach up to 5 text/code files with your prompt\n"
-            f"{pe(E['next'])} Long/code responses are sent as a file automatically\n\n"
-            f"{pe(E['user'])} /start — {bold('Main menu')}\n"
-            f"{pe(E['user'])} /me — {bold('Your profile')}\n"
-            f"{pe(E['sparkle'])} /cmds — {bold('This help message')}\n\n"
-            f"{pe(E['star'])} {bold('Admin Commands:')}\n"
-            f"{pe(E['next'])} /admin id — {bold('Add admin')}\n"
-            f"{pe(E['next'])} /auth id — {bold('Give premium')}\n"
-            f"{pe(E['next'])} /unauth id — {bold('Remove premium')}\n"
-            f"{pe(E['next'])} /ban id — {bold('Ban user')}\n"
-            f"{pe(E['next'])} /unban id — {bold('Unban user')}\n"
-            f"{pe(E['next'])} /key users days — {bold('Generate 1 multi-use key')}\n\n"
-            f"{pe(E['gem'])} {bold('Premium roles:')} free · premium · admin · owner\n"
-            f"{pe(E['bolt'])} {bold('Limits:')} free=100 · premium=1000 · admin=2000 · owner=3000"
+            f"{pe(E['star'])} {bold('B3 Auth:' )}\n"
+            f"{pe(E['bolt'])} /b3 cc|mm|yy|cvv — {bold('single check')}\n"
+            f"{pe(E['rocket'])} /mb3 cc ... — {bold('mass check')}\n"
+            f"{pe(E['dice'])} /b3txt — {bold('file check (.txt)')}\n\n"
+            f"{pe(E['star'])} {bold('Braintree VBV (2D/3D):')}\n"
+            f"{pe(E['bolt'])} /vbv cc|mm|yy|cvv — {bold('single VBV check')}\n"
+            f"{pe(E['rocket'])} /mvbv cc ... — {bold('mass VBV (20 inline)')}"
         )
 
     return text, nav(page)
@@ -3320,83 +3343,8 @@ async def cmd_adc(message: types.Message):
 
 @router.message(F.text & ~F.text.startswith("/"))
 async def handle_plain_text(message: types.Message):
-    """If a user sends raw CC(s) in PRIVATE chat, auto-detect and offer to check."""
-    # Only in private chat
-    if message.chat.type != "private":
-        return
-
-    text = message.text or ""
-
-    # Try to find ALL CCs in the message
-    from helpers import CC_PATTERN
-    all_ccs = _DedupeList()
-    for m in CC_PATTERN.finditer(text):
-        cc = f"{m.group(1)}|{m.group(2)}|{m.group(3)}|{m.group(4)}"
-        if cc not in all_ccs:
-            all_ccs.append(cc)
-
-    # Fallback: line-by-line
-    if not all_ccs:
-        for line in text.strip().splitlines():
-            line = line.strip()
-            parts = re.split(r'[|/]', line)
-            if len(parts) >= 4:
-                cc = "|".join(p.strip() for p in parts[:4])
-                if cc not in all_ccs:
-                    all_ccs.append(cc)
-
-    if not all_ccs:
-        return  # No CC found, ignore
-
-    joined = await check_user_joined(message.from_user.id)
-    if not joined:
-        await message.reply(JOIN_MSG, reply_markup=join_keyboard())
-        return
-
-    if len(all_ccs) == 1:
-        # Single CC — quick check button
-        cc_str = all_ccs[0]
-        check_btn = {
-            "inline_keyboard": [
-                [{
-                    "text": f"{bold('Check This CC')}",
-                    "callback_data": f"quick_check:{cc_str}",
-                    "icon_custom_emoji_id": "5229077409629752304",
-                    "style": "primary",
-                }],
-            ]
-        }
-        await message.reply(
-            f"{pe(E['sparkle'])} {bold('CC Detected!')}\n\n"
-            f"{pe(E['bolt'])} <tg-spoiler>{cc_str}</tg-spoiler>\n\n"
-            f"{pe(E['next'])} {bold('Tap below to check it.')}",
-            reply_markup=check_btn,
-        )
-    else:
-        # Multiple CCs — mass check button
-        count = min(len(all_ccs), MSH_MAX_CCS)
-        ccs_joined = "\n".join(all_ccs[:MSH_MAX_CCS])
-        # Store CCs in callback data is too long, use message_id reference
-        check_btn = {
-            "inline_keyboard": [
-                [{
-                    "text": f"{bold('Mass Check')} {bold(str(count))} {bold('CCs')}",
-                    "callback_data": f"quick_msh:{message.message_id}",
-                    "icon_custom_emoji_id": "5229077409629752304",
-                    "style": "primary",
-                }],
-            ]
-        }
-        preview = "\n".join(f"{pe(E['bolt'])} <tg-spoiler>{cc}</tg-spoiler>" for cc in all_ccs[:5])
-        extra = ""
-        if len(all_ccs) > 5:
-            extra = f"\n{pe(E['next'])} {bold('...')} {bold(str(len(all_ccs) - 5))} {bold('more')}"
-        await message.reply(
-            f"{pe(E['sparkle'])} {bold(str(len(all_ccs)))} {bold('CCs Detected!')}\n\n"
-            f"{preview}{extra}\n\n"
-            f"{pe(E['next'])} {bold('Tap below to mass check.')}",
-            reply_markup=check_btn,
-        )
+    """Auto-check disabled — user must use /sc /msc commands explicitly."""
+    return
 
 
 @router.callback_query(F.data.startswith("quick_check:"))
@@ -3601,82 +3549,8 @@ async def cb_quick_msh(callback: types.CallbackQuery):
 
 @router.message(F.document & F.chat.type.in_({"private"}))
 async def handle_private_document(message: types.Message):
-    """Auto-detect .txt CC files dropped in private chat."""
-    doc = message.document
-    if not doc or not doc.file_name or not doc.file_name.lower().endswith(".txt"):
-        return
-
-    joined = await check_user_joined(message.from_user.id)
-    if not joined:
-        await message.reply(JOIN_MSG, reply_markup=join_keyboard())
-        return
-
-    # ── Filename ban-check ────────────────────────────────────────────────────
-    if auth.is_banned(message.from_user.id):
-        return
-    if await guard_gen_filename(message, message.from_user.id):
-        return
-
-    # Download and count CCs
-    try:
-        from io import BytesIO
-        buf = BytesIO()
-        await bot.download(doc.file_id, destination=buf)
-        buf.seek(0)
-        file_text = buf.read().decode("utf-8", errors="ignore")
-    except Exception:
-        return
-
-    from helpers import CC_PATTERN
-    all_ccs = _DedupeList()
-    for m in CC_PATTERN.finditer(file_text):
-        cc = f"{m.group(1)}|{m.group(2)}|{m.group(3)}|{m.group(4)}"
-        if cc not in all_ccs:
-            all_ccs.append(cc)
-
-    # Fallback: line-by-line
-    if not all_ccs:
-        for line in file_text.strip().splitlines():
-            line = line.strip()
-            parts = re.split(r'[|/]', line)
-            if len(parts) >= 4:
-                cc = "|".join(p.strip() for p in parts[:4])
-                if cc not in all_ccs:
-                    all_ccs.append(cc)
-
-    if not all_ccs:
-        await message.reply(
-            f"{pe(E['cross'])} {bold('No valid CCs found in this file!')}"
-        )
-        return
-
-    count = len(all_ccs)
-
-    # Preview first 5 CCs
-    preview = "\n".join(f"{pe(E['bolt'])} <tg-spoiler>{cc}</tg-spoiler>" for cc in all_ccs[:5])
-    extra = ""
-    if count > 5:
-        extra = f"\n{pe(E['next'])} {bold('...')} {bold(str(count - 5))} {bold('more')}"
-
-    check_btn = {
-        "inline_keyboard": [
-            [{
-                "text": f"{bold('Check')} {bold(str(count))} {bold('CCs')}",
-                "callback_data": f"quick_ran:{message.message_id}",
-                "icon_custom_emoji_id": "5229077409629752304",
-                "style": "primary",
-            }],
-        ]
-    }
-
-    await message.reply(
-        f"{pe(E['sparkle'])} {bold('CC File Detected!')} {pe(E['dice'])}\n\n"
-        f"{pe(E['bolt'])} {bold('File:')} {bold(doc.file_name)}\n"
-        f"{pe(E['star'])} {bold('Total CCs:')} {bold(str(count))}\n\n"
-        f"{preview}{extra}\n\n"
-        f"{pe(E['next'])} {bold('Tap below to start checking.')}",
-        reply_markup=check_btn,
-    )
+    """Auto-check disabled — user checks files via /msctxt explicitly."""
+    return
 
 
 @router.callback_query(F.data.startswith("quick_ran:"))
@@ -5366,15 +5240,6 @@ async def cmd_hit(message: types.Message):
     user_id = message.from_user.id
 
     if auth.is_banned(user_id):
-        return
-
-    # Premium+ (per spec) — premium, admin and owner
-    if not auth.has_premium_access(user_id, message.chat.id):
-        await message.reply(
-            f"{pe(E['cross'])} {bold('Premium Access Required!')}"
-            f"\n\n{pe(E['bolt'])} {bold('Contact admin or redeem a key: @goonermen')}"
-            f"\n{pe(E['next'])} /redeem {bold('goon-xxxxxxxx')}"
-        )
         return
 
     if user_id in _HIT_ACTIVE_USERS:
