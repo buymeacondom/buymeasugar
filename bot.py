@@ -1424,17 +1424,6 @@ def menu_keyboard() -> dict:
     }
 
 
-def menu_reply_keyboard() -> dict:
-    """Reply keyboard — tapping a command button SENDS that command to the chat."""
-    return {
-        "keyboard": [
-            [{"text": "/sc"}, {"text": "/msc"}, {"text": "/msctxt"}],
-            [{"text": "/hit"}, {"text": "/proxy"}, {"text": "/bin"}],
-            [{"text": "/myproxy"}, {"text": "/redeem"}, {"text": "/me"}],
-        ],
-        "resize_keyboard": True,
-    }
-
 def back_keyboard() -> dict:
     """Single blue Back button to return to the main menu."""
     return {
@@ -1575,7 +1564,7 @@ async def cmd_start(message: types.Message):
 
     await message.reply(
         _welcome_card(message.from_user),
-        reply_markup=menu_reply_keyboard(),
+        reply_markup=menu_keyboard(),
     )
 
 
