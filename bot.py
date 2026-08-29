@@ -90,11 +90,11 @@ from helpers import (
     extract_cc, close_session, classify_gate_response,
     gate_is_charged, gate_is_approved, proxy_dict_to_url,
 )
-import api
+import checker_bridge
 import auth
 try:
-    #import ayden
-    _AYDEN_AVAILABLE = False
+    import ayden
+    _AYDEN_AVAILABLE = True
 except ImportError:
     ayden = None  # type: ignore
     _AYDEN_AVAILABLE = False
@@ -216,18 +216,22 @@ GROUP_LINK   = "https://t.me/+Up_lgvTmxp1mM2Ux"
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
-PROXY_FILE = os.path.join(BASE_DIR, "proxy.json")
-SITES_FILE = os.path.join(BASE_DIR, "sites.txt")
+# DATA_DIR override: point this at a persistent volume on Railway so user data
+# (proxies, sites, banned, etc.) survives redeploys. Defaults to BASE_DIR.
+DATA_DIR   = os.environ.get("DATA_DIR", BASE_DIR) or BASE_DIR
+os.makedirs(DATA_DIR, exist_ok=True)
+PROXY_FILE = os.path.join(DATA_DIR, "proxy.json")
+SITES_FILE = os.path.join(DATA_DIR, "sites.txt")
 # Must match checker nodes (shp.py _SITES_MAP). Prefer this over sites.txt.
-SITES_JSON = os.path.join(BASE_DIR, "sites.json")
-STSITE_FILE = os.path.join(BASE_DIR, "stsite.json")
-RZSITE_FILE = os.path.join(BASE_DIR, "rzsite.json")
-GATESITE_FILE = os.path.join(BASE_DIR, "gatesite.json")
-SKKEYS_FILE = os.path.join(BASE_DIR, "skkeys.json")  # per-user Stripe SK+PK for /skcvv
-BANNED_FILE            = os.path.join(BASE_DIR, "banned.json")
-FREEPROXY_COOLDOWN_FILE = os.path.join(BASE_DIR, "freeproxy_cooldown.json")  # legacy
-FREEPROXY_LAST_FILE     = os.path.join(BASE_DIR, "freeproxy_last.json")      # legacy
-FREEPROXY_DATA_FILE     = os.path.join(BASE_DIR, "freeproxy_data.json")      # unified
+SITES_JSON = os.path.join(DATA_DIR, "sites.json")
+STSITE_FILE = os.path.join(DATA_DIR, "stsite.json")
+RZSITE_FILE = os.path.join(DATA_DIR, "rzsite.json")
+GATESITE_FILE = os.path.join(DATA_DIR, "gatesite.json")
+SKKEYS_FILE = os.path.join(DATA_DIR, "skkeys.json")  # per-user Stripe SK+PK for /skcvv
+BANNED_FILE            = os.path.join(DATA_DIR, "banned.json")
+FREEPROXY_COOLDOWN_FILE = os.path.join(DATA_DIR, "freeproxy_cooldown.json")  # legacy
+FREEPROXY_LAST_FILE     = os.path.join(DATA_DIR, "freeproxy_last.json")      # legacy
+FREEPROXY_DATA_FILE     = os.path.join(DATA_DIR, "freeproxy_data.json")      # unified
 
 # ── Ban system ────────────────────────────────────────────────────────────────
 _banned_users: set[int] = set()
@@ -838,12 +842,14 @@ def _load_proxies() -> dict:
 
 def _save_proxies(data: dict):
     global _proxy_cache, _proxy_cache_mtime
-    with open(PROXY_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    # Update the in-memory cache FIRST so checks work immediately, even if the
+    # disk write fails (e.g. read-only filesystem on Railway).
     _proxy_cache = data
     try:
+        with open(PROXY_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
         _proxy_cache_mtime = os.path.getmtime(PROXY_FILE)
-    except OSError:
+    except Exception:
         _proxy_cache_mtime = 0.0
 
 MAX_PROXIES_PER_USER = 30
