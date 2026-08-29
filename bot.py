@@ -90,11 +90,11 @@ from helpers import (
     extract_cc, close_session, classify_gate_response,
     gate_is_charged, gate_is_approved, proxy_dict_to_url,
 )
-import checker_bridge
+import api
 import auth
 try:
-    import ayden
-    _AYDEN_AVAILABLE = True
+    #import ayden
+    _AYDEN_AVAILABLE = False
 except ImportError:
     ayden = None  # type: ignore
     _AYDEN_AVAILABLE = False
