@@ -1342,9 +1342,13 @@ _JOIN_CACHE_TTL_NO  = 30    # 30 sec — cache joined=False (re-check fast after
 
 async def check_user_joined(user_id: int, force: bool = False) -> bool:
     """Check if user has joined both channel and group.
+    Owner and admins are always allowed (no join check).
     Positive results cached 5 min; negative results cached 30 sec.
     Pass force=True (used by Verify button) to always do a fresh API call.
     """
+    # Owner and admins bypass the join requirement entirely
+    if auth.is_owner(user_id) or auth.is_admin(user_id):
+        return True
     now = time.time()
     if not force:
         cached = _join_cache.get(user_id)
@@ -1490,8 +1494,8 @@ def _welcome_card(user) -> str:
     access = {"owner": "All", "admin": "All", "premium": "All", "free": "None"}.get(role, "None")
 
     def _c(name: str) -> str:
-        """Render a command name (plain bold — no redirect link)."""
-        return bold(name)
+        """Render a command name in blue (Telegram link colour, XD theme)."""
+        return f'<a href="tg://user?id={bot.id}">{bold(name)}</a>'
 
     return (
         f"{pe(_WC['face'])} {bold('scarlet')}\n\n"
@@ -5397,9 +5401,9 @@ async def cmd_hit(message: types.Message):
         )
         return
 
-    merchant = first_result.get("merchant") or "-"
-    product = first_result.get("product") or "-"
-    amount_str = first_result.get("price_display") or "-"
+    merchant = first_result.get("merchant") or first_result.get("result_msg") or "-"
+    product = first_result.get("product") or first_result.get("api_status") or "-"
+    amount_str = first_result.get("price_display") or first_result.get("amount") or "-"
     success_url = first_result.get("success_url") or "-"
     if success_url != "-" and len(success_url) > 50:
         from urllib.parse import urlparse as _urlparse
