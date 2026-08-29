@@ -1274,13 +1274,25 @@ def set_all_stop_flags(value: bool = True) -> None:
 
 
 class _MaintenanceMiddleware(_BaseMiddleware):
-    """Blocks all commands except management ones while maintenance is ON."""
+    """Blocks check commands while maintenance is ON.
+
+    Proxy management (/proxy /myproxy /rmproxy /bin /redeem), the menu and
+    owner commands stay available so the owner can manage the bot during
+    maintenance.
+    """
+
+    _ALLOWED = ("imaintain", "cmaintain", "start", "me", "cmds", "help", "adc",
+                "proxy", "myproxy", "rmproxy", "bin", "redeem")
 
     async def __call__(self, handler, event, data):
         if MAINTENANCE_MODE and isinstance(event, types.Message):
+            user: types.User | None = data.get("event_from_user")
+            # Owner is never blocked by maintenance
+            if user and auth.is_owner(user.id):
+                return await handler(event, data)
             text = getattr(event, "text", "") or ""
             cmd = text.split()[0].lstrip("/").lower() if text.startswith("/") else ""
-            if cmd and cmd not in ("imaintain", "cmaintain", "start", "me", "cmds", "help", "adc"):
+            if cmd and cmd not in self._ALLOWED:
                 try:
                     await event.reply(
                         f"{pe(E['warn'])} {bold('Maintenance Mode')}\n\n"
