@@ -829,7 +829,8 @@ def _load_proxies() -> dict:
     try:
         mt = os.path.getmtime(PROXY_FILE)
     except OSError:
-        return {}
+        # File missing (read-only FS / fresh deploy) — fall back to in-memory cache
+        return _proxy_cache if _proxy_cache is not None else {}
     if _proxy_cache is not None and mt == _proxy_cache_mtime:
         return _proxy_cache
     try:
@@ -1422,6 +1423,18 @@ def menu_keyboard() -> dict:
         ]
     }
 
+
+def menu_reply_keyboard() -> dict:
+    """Reply keyboard — tapping a command button SENDS that command to the chat."""
+    return {
+        "keyboard": [
+            [{"text": "/sc"}, {"text": "/msc"}, {"text": "/msctxt"}],
+            [{"text": "/hit"}, {"text": "/proxy"}, {"text": "/bin"}],
+            [{"text": "/myproxy"}, {"text": "/redeem"}, {"text": "/me"}],
+        ],
+        "resize_keyboard": True,
+    }
+
 def back_keyboard() -> dict:
     """Single blue Back button to return to the main menu."""
     return {
@@ -1487,12 +1500,9 @@ def _welcome_card(user) -> str:
     cc_limit = auth.get_cc_limit(uid)
     access = {"owner": "All", "admin": "All", "premium": "All", "free": "None"}.get(role, "None")
 
-    # Blue command link helper
-    _bot_link = f"tg://user?id={bot.id}"
-
     def _c(name: str) -> str:
-        """Render a command name in blue (Telegram link colour)."""
-        return f'<a href="{_bot_link}">{bold(name)}</a>'
+        """Render a command name (plain bold — no redirect link)."""
+        return bold(name)
 
     return (
         f"{pe(_WC['face'])} {bold('scarlet')}\n\n"
@@ -1565,7 +1575,7 @@ async def cmd_start(message: types.Message):
 
     await message.reply(
         _welcome_card(message.from_user),
-        reply_markup=menu_keyboard(),
+        reply_markup=menu_reply_keyboard(),
     )
 
 
@@ -1942,7 +1952,7 @@ async def cmd_myproxy(message: types.Message):
 
     lines = [f"{pe(E['link'])} {bold('Your Proxies')} [{bold(str(len(proxy_list)))}/{bold(str(MAX_PROXIES_PER_USER))}]\n"]
     for i, p in enumerate(proxy_list[:10], 1):
-        ip = p.get('ip', '-')
+        ip = p.get('host') or p.get('ip', '-')
         port = p.get('port', '-')
         ptype = p.get('type', 'http').upper()
         lines.append(f"{pe(E['bolt'])} {bold(str(i))}. {bold(ip)}:{bold(port)} ({bold(ptype)})")
@@ -2065,7 +2075,7 @@ async def cb_check_proxy(callback: types.CallbackQuery):
     lines.append("")
 
     for i, p in enumerate(working[:10], 1):
-        ip = p.get('ip', '-')
+        ip = p.get('host') or p.get('ip', '-')
         port = p.get('port', '-')
         ptype = p.get('type', 'http').upper()
         lines.append(f"{pe(E['bolt'])} {bold(str(i))}. {bold(ip)}:{bold(port)} ({bold(ptype)})")
@@ -2710,7 +2720,7 @@ async def cmd_sh(message: types.Message):
     )
 
     # ── Run check + BIN lookup in parallel (saves 2-10s) ──────────────────────
-    _chk = asyncio.create_task(checker_bridge.check_card_site(cc_str, site, proxy_data))
+    _chk = asyncio.create_task(api.check_card_site(cc_str, site, proxy_data))
     _bin = asyncio.create_task(bin_lookup(bin_num))
     try:
         result = await _chk
@@ -2974,7 +2984,7 @@ async def _msh_check_single(
         sem = get_user_semaphore(user_id)
         async with sem:
             try:
-                result = await checker_bridge.check_card_site(cc_str, site, proxy_data)
+                result = await api.check_card_site(cc_str, site, proxy_data)
             except Exception as e:
                 result = {"Response": str(e)[:80], "Price": "-", "Gate": "-", "Status": "Error"}
         bin_info = await _bin
@@ -3384,7 +3394,7 @@ async def cb_quick_check(callback: types.CallbackQuery):
     )
 
     # ── Run check + BIN lookup in parallel (saves 2-10s) ──────────────────────
-    _chk = asyncio.create_task(checker_bridge.check_card_site(cc_str, site, proxy_data))
+    _chk = asyncio.create_task(api.check_card_site(cc_str, site, proxy_data))
     _bin = asyncio.create_task(bin_lookup(bin_num))
     try:
         result = await _chk
@@ -3749,13 +3759,13 @@ async def _ran_check_one(
     proxy_data = random.choice(proxy_list) if proxy_list else None
     user_sem = get_ran_user_semaphore(user_id)
 
-    # NOTE: checker_bridge → shopify_check_with_fallback already retries on dead
+    # NOTE: api → shopify_check_with_fallback already retries on dead
     # sites internally, so we do NOT add a second full retry here. Doing both
     # meant one CC could chain up to ~10 timeouts and freeze a worker for minutes.
     async with _ran_global_sem:
         async with user_sem:
             try:
-                result = await checker_bridge.check_card_site(cc_str, site, proxy_data)
+                result = await api.check_card_site(cc_str, site, proxy_data)
             except Exception as e:
                 result = {"Response": str(e)[:80], "Price": "-", "Gate": "-"}
 
@@ -5820,7 +5830,7 @@ FILTER_BATCH_SIZE = 100
 async def _filter_check_site(site: str, proxy_data: dict | None) -> dict:
     """Check a single site with the hardcoded CC and return verdict."""
     try:
-        result = await checker_bridge.check_card_site(_FILTER_CC, site, proxy_data)
+        result = await api.check_card_site(_FILTER_CC, site, proxy_data)
     except Exception as e:
         return {"site": site, "keep": False, "reason": str(e)[:60]}
 
@@ -12247,10 +12257,10 @@ async def _build_api_message() -> tuple[str, dict]:
     Build the /api status message + inline keyboard.
     Pings all nodes in parallel and shows health + enabled/disabled toggle.
     """
-    nodes = checker_bridge.get_all_nodes()
+    nodes = api.get_all_nodes()
 
     # Ping all nodes concurrently
-    health_tasks = [checker_bridge.check_node_health(n) for n in nodes]
+    health_tasks = [api.check_node_health(n) for n in nodes]
     health_results = await asyncio.gather(*health_tasks, return_exceptions=True)
 
     lines = [f"{pe(E['globe'])} {bold('Checker API Nodes')}\n"]
@@ -12260,7 +12270,7 @@ async def _build_api_message() -> tuple[str, dict]:
         if isinstance(alive, Exception):
             alive = False
 
-        disabled = checker_bridge.is_node_disabled(node)
+        disabled = api.is_node_disabled(node)
         ip_port  = node.replace("http://", "")
 
         # Status indicators
@@ -12332,7 +12342,7 @@ async def cb_api_toggle(callback: types.CallbackQuery):
         await callback.answer()
         return
 
-    nodes = checker_bridge.get_all_nodes()
+    nodes = api.get_all_nodes()
     if idx < 0 or idx >= len(nodes):
         await callback.answer(bold("Invalid node index."), show_alert=True)
         return
@@ -12340,11 +12350,11 @@ async def cb_api_toggle(callback: types.CallbackQuery):
     node = nodes[idx]
     ip_port = node.replace("http://", "")
 
-    if checker_bridge.is_node_disabled(node):
-        checker_bridge.enable_node(node)
+    if api.is_node_disabled(node):
+        api.enable_node(node)
         await callback.answer(f"Node {idx+1} ({ip_port}) ENABLED", show_alert=False)
     else:
-        checker_bridge.disable_node(node)
+        api.disable_node(node)
         await callback.answer(f"Node {idx+1} ({ip_port}) DISABLED", show_alert=False)
 
     # Rebuild and update the message
@@ -12853,7 +12863,8 @@ async def _test_gate_site(gate_type: str, url: str, cc: str, mm: str, yy: str, c
         
         elif gate_type == "shopify":
             result = await asyncio.get_running_loop().run_in_executor(
-                CHECKER_POOL, lambda: checker_bridge.check_card_site(f"{cc}|{mm}|{yy}|{cvv}", proxy_list, url)
+                CHECKER_POOL, lambda: api.check_card_site(
+                    f"{cc}|{mm}|{yy}|{cvv}", url, proxy_list[0] if proxy_list else None)
             )
             return {"success": True, "msg": str(result)[:200]}
         
