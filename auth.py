@@ -206,7 +206,7 @@ class UserAuth:
         return None
 
     def generate_key(self, key_type: str, max_users: int, days: int = 0, credits: int = 0) -> str:
-        prefix = {"pkey": "HCHK-P", "ckey": "HCHK-C"}.get(key_type, "HCHK")
+        prefix = {"pkey": "goon-P", "ckey": "goon-C"}.get(key_type, "goon")
         rand = "".join(random.choices(string.ascii_uppercase + string.digits, k=12))
         key = f"{prefix}-{rand}"
         self.keys[key] = {
