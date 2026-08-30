@@ -1748,7 +1748,7 @@ async def cb_menu_profile(callback: types.CallbackQuery):
         f"{pe(E['star'])} {bold('ID:')} {bold(str(uid))}\n\n"
         f"{pe(E['gem'])} {bold('Plan:')} {prem_line}\n"
         f"{pe(E['bolt'])} {bold('Proxy:')} {proxy_status}\n\n"
-        f"{pe(E['rocket'])} {bold('CC Limit (/ran):')} {bold(str(cc_limit))}"
+        f"{pe(E['rocket'])} {bold('CC Limit (/msctxt):')} {bold(str(cc_limit))}"
     )
     try:
         await safe_edit(callback.message, text, reply_markup=back_keyboard())
@@ -5282,15 +5282,20 @@ async def cmd_hit(message: types.Message):
 
     if not raw_text.strip():
         await message.reply(
-            f"{pe(E['warn'])} {bold('Usage:')}\n\n"
-            f"{pe(E['next'])} /hit <Stripe URL>\n"
-            f"cc|mm|yy|cvv\n\n"
-            f"{pe(E['bolt'])} {bold('Supported links:')}\n"
-            f"• checkout.stripe.com/c/pay/...\n"
-            f"• billing.stripe.com/p/session/...\n"
-            f"• invoice.stripe.com/i/...\n"
-            f"• Custom domain with cs_live_...\n\n"
-            f"{pe(E['bolt'])} {bold('Max')} {bold(str(HIT_MAX_CCS))} {bold('CCs per check.')}"
+            f"{pe(E['bolt'])} {bold('HIT Command')}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{pe(E['warn'])} {bold('Usage:')}\n"
+            f"{pe(E['next'])} {bold('/hit')} {bold('<checkout url>')}\n"
+            f"{pe(E['next'])} {bold('<cc|mm|yy|cvv>')}\n\n"
+            f"{pe(E['check'])} {bold('Example:')}\n"
+            f"{pe(E['link'])} /hit https://checkout.stripe.com/c/pay/cs_live_xxx\n"
+            f"{pe(R['cc'])} 4242424242424242|12|28|123\n\n"
+            f"{pe(E['globe'])} {bold('Supported links:')}\n"
+            f"{pe(E['next'])} checkout.stripe.com/c/pay/...\n"
+            f"{pe(E['next'])} billing.stripe.com/p/session/...\n"
+            f"{pe(E['next'])} invoice.stripe.com/i/...\n"
+            f"{pe(E['next'])} Custom domain with cs_live_...\n\n"
+            f"{pe(E['gem'])} {bold('Max')} {bold(str(HIT_MAX_CCS))} {bold('CCs per check.')}"
         )
         return
 
